@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# flux_agent multi-panel manager (optimized version)
-# 作者: echo00023 (优化版)
+# flux_agent 多面板管理脚本 - 完整修复版
+# 修复了：不进入菜单、退出不确认、添加面板时自动创建服务等问题
 
 set -e
 
@@ -12,178 +12,161 @@ mkdir -p "$PANELS_ROOT"
 
 show_existing_services() {
   echo "[INFO] 当前系统中的 flux_agent 相关服务："
-  systemctl list-units 'flux_agent*.service' --no-pager --all || true
-  echo ""
+  systemctl list-units 'flux_agent*.service' --no-pager --all 2>/dev/null || true
+  echo
 }
 
+# 基础服务安装（只在第一次需要时运行）
 create_base_service() {
-  if systemctl list-unit-files | grep -q '^flux_agent\.service'; then
-    echo "[INFO] 检测到已存在 flux_agent.service，跳过创建基础服务。"
+  if [ -f "/etc/systemd/system/flux_agent.service" ] || systemctl list-unit-files | grep -q '^flux_agent\.service'; then
+    echo "[INFO] 检测到基础 flux_agent 已存在，跳过安装。"
     return
   fi
 
-  echo "[INFO] 未检测到 flux_agent.service，开始创建基础服务..."
-  read -rp "请输入面板地址 (IP:端口): " PANEL_ADDR
-  read -rp "请输入面板密钥: " PANEL_SECRET
+  echo "[INFO] 未检测到基础 flux_agent，开始安装..."
+  read -rp "请输入基础面板地址 (IP:端口): " BASE_ADDR
+  read -rp "请输入基础面板密钥: " BASE_SECRET
 
   mkdir -p "$BASE_DIR"
   cd "$BASE_DIR"
 
-  echo "[INFO] 下载并安装 flux_agent..."
-  curl -L https://github.com/bqlpfy/flux-panel/releases/download/2.0.6-beta/install.sh -o ./install.sh
-  chmod +x ./install.sh
-  ./install.sh -a "$PANEL_ADDR" -s "$PANEL_SECRET"
+  curl -L https://github.com/bqlpfy/flux-panel/releases/download/2.0.6-beta/install.sh -o install.sh
+  chmod +x install.sh
+  ./install.sh -a "$BASE_ADDR" -s "$BASE_SECRET"
 
-  echo "[INFO] 基础 flux_agent.service 已创建并运行。"
+  echo "[SUCCESS] 基础 flux_agent 安装完成。"
 }
 
 ensure_base() {
-  create_base_service
+  if [ ! -d "$BASE_DIR" ] || [ ! -f "$BASE_DIR/flux_agent" ]; then
+    create_base_service
+  fi
 }
 
 list_panels() {
   echo "当前已配置的面板实例:"
-  if [ ! -d "$PANELS_ROOT" ] || [ -z "$(ls -A "$PANELS_ROOT")" ]; then
-    echo "  (无面板，请先添加)"
+  if [ ! "$(ls -A "$PANELS_ROOT" 2>/dev/null)" ]; then
+    echo "  (无面板实例，请先添加)"
     return
   fi
-  for d in "$PANELS_ROOT"/*; do
+  for d in "$PANELS_ROOT"/*/; do
     [ -d "$d" ] || continue
-    name="$(basename "$d")"
-    echo "  - $name"
+    name=$(basename "$d")
+    status=$(systemctl is-active "flux_agent_${name}.service" 2>/dev/null || echo "unknown")
+    echo "  - $name  (服务状态: $status)"
   done
 }
 
 add_panel() {
   ensure_base
 
-  read -rp "为新面板输入一个标识名(例如: p1 / hk1): " PANEL_NAME
-  PANEL_NAME="${PANEL_NAME// /}"
-  if [ -z "$PANEL_NAME" ]; then
-    echo "[ERROR] 面板标识名不能为空。"
+  read -rp "输入新面板标识名 (英文/数字，如 p1, hk1): " name
+  name=${name// /}
+  if [ -z "$name" ]; then
+    echo "[ERROR] 标识名不能为空"
+    return
+  fi
+  if [ -d "$PANELS_ROOT/$name" ]; then
+    echo "[ERROR] 面板 $name 已存在"
     return
   fi
 
-  PANEL_DIR="$PANELS_ROOT/$PANEL_NAME"
-  if [ -d "$PANEL_DIR" ]; then
-    echo "[ERROR] 面板目录 $PANEL_DIR 已存在，换一个名字。"
-    return
-  fi
+  mkdir -p "$PANELS_ROOT/$name"
+  cp -a "$BASE_DIR/." "$PANELS_ROOT/$name/"
+  rm -f "$PANELS_ROOT/$name/device.id"
 
-  mkdir -p "$PANEL_DIR"
-  cp -a "$BASE_DIR/." "$PANEL_DIR/"
-  rm -f "$PANEL_DIR/device.id"
+  read -rp "输入该面板地址 (IP:端口): " addr
+  read -rp "输入该面板密钥: " secret
 
-  read -rp "请输入该面板的后端地址 (IP:端口): " PANEL_ADDR
-  read -rp "请输入该面板的密钥: " PANEL_SECRET
-
-  CONFIG_FILE="$PANEL_DIR/config.json"
-  if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_FILE" ]; then
-    jq --arg addr "$PANEL_ADDR" --arg secret "$PANEL_SECRET" '.addr = $addr | .secret = $secret' "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+  config="$PANELS_ROOT/$name/config.json"
+  if command -v jq >/dev/null 2>&1; then
+    jq --arg a "$addr" --arg s "$secret" '.addr=$a | .secret=$s' "$config" > "${config}.tmp" && mv "${config}.tmp" "$config"
   else
-    cat >"$CONFIG_FILE" <<EOF
-{
-  "addr": "$PANEL_ADDR",
-  "secret": "$PANEL_SECRET"
-}
-EOF
+    sed -i "s|\"addr\": \".*\"|\"addr\": \"$addr\"|; s|\"secret\": \".*\"|\"secret\": \"$secret\"|" "$config"
   fi
 
-  SERVICE_NAME="flux_agent_${PANEL_NAME}.service"
-  cat >"$SYSTEMD_DIR/$SERVICE_NAME" <<EOF
+  service="flux_agent_${name}.service"
+  cat > "$SYSTEMD_DIR/$service" <<EOF
 [Unit]
-Description=Flux Agent panel $PANEL_NAME
+Description=Flux Agent Panel $name
 After=network.target
 
 [Service]
-WorkingDirectory=$PANEL_DIR
-ExecStart=$PANEL_DIR/flux_agent -C config.json
+WorkingDirectory=$PANELS_ROOT/$name
+ExecStart=$PANELS_ROOT/$name/flux_agent -C config.json
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
   systemctl daemon-reload
-  systemctl enable --now "$SERVICE_NAME"
-  echo "[SUCCESS] 面板 $PANEL_NAME 添加完成并启动！"
+  systemctl enable --now "$service"
+  echo "[SUCCESS] 面板 $name 添加成功并已启动！"
 }
 
 remove_panel() {
   list_panels
-  read -rp "请输入要删除的面板标识名: " PANEL_NAME
-  PANEL_NAME="${PANEL_NAME// /}"
-  PANEL_DIR="$PANELS_ROOT/$PANEL_NAME"
-  SERVICE_NAME="flux_agent_${PANEL_NAME}.service"
-
-  if [ ! -d "$PANEL_DIR" ]; then
-    echo "[ERROR] 面板目录 $PANEL_DIR 不存在。"
+  read -rp "输入要删除的面板标识名: " name
+  name=${name// /}
+  if [ ! -d "$PANELS_ROOT/$name" ]; then
+    echo "[ERROR] 面板 $name 不存在"
     return
   fi
 
-  systemctl disable --now "$SERVICE_NAME" 2>/dev/null || true
-  rm -rf "$PANEL_DIR"
-  rm -f "$SYSTEMD_DIR/$SERVICE_NAME"
+  service="flux_agent_${name}.service"
+  systemctl disable --now "$service" 2>/dev/null || true
+  rm -f "$SYSTEMD_DIR/$service"
+  rm -rf "$PANELS_ROOT/$name"
   systemctl daemon-reload
-  echo "[SUCCESS] 面板 $PANEL_NAME 已删除。"
+  echo "[SUCCESS] 面板 $name 已删除"
 }
 
-remove_all_and_cleanup() {
-  echo "[WARN] 该操作将删除所有面板和服务！"
-  read -rp "确认继续？(yes/NO): " ans
-  [ "$ans" != "yes" ] && echo "[INFO] 已取消。" && return
+remove_all() {
+  read -rp "警告：将删除所有面板和服务！输入 yes 确认: " confirm
+  [ "$confirm" != "yes" ] && echo "已取消" && return
 
-  for unit in $(systemctl list-unit-files 'flux_agent_*.service' --no-legend | awk '{print $1}') $(systemctl list-unit-files 'flux_agent@*.service' --no-legend | awk '{print $1}'); do
-    systemctl disable --now "$unit" 2>/dev/null || true
-    rm -f "$SYSTEMD_DIR/$unit" 2>/dev/null || true
+  for s in "$SYSTEMD_DIR"/flux_agent_*.service; do
+    [ -f "$s" ] || continue
+    systemctl disable --now "$(basename "$s")" 2>/dev/null || true
+    rm -f "$s"
   done
-
   rm -rf "$PANELS_ROOT"
   systemctl daemon-reload
-  echo "[SUCCESS] 所有面板已清理完毕。"
+  echo "[SUCCESS] 所有面板已清理"
 }
 
 menu() {
+  clear
   show_existing_services
-
   while true; do
-    echo ""
     echo "===== flux_agent 多面板管理 ====="
     list_panels
-    echo "---------------------------------"
+    echo
     echo "1) 添加新面板"
-    echo "2) 删除面板"
-    echo "3) 删除所有面板并清理服务"
+    echo "2) 删除指定面板"
+    echo "3) 删除所有面板并清理"
     echo "0) 退出程序"
-    echo ""
-    read -rp "请选择操作 [0-3]（或 q 退出）: " choice
-    case "${choice,,}" in  # 不区分大小写
-      1)
-        add_panel
+    echo
+    read -rp "请选择 [0-3]: " choice
+
+    case "$choice" in
+      1) add_panel ;;
+      2) remove_panel ;;
+      3) remove_all ;;
+      0) 
+        read -rp "确认退出？(y/N): " yn
+        [[ "$yn" =~ ^[Yy]$ ]] && echo "再见！" && exit 0
         ;;
-      2)
-        remove_panel
-        ;;
-      3)
-        remove_all_and_cleanup
-        ;;
-      0|q|quit|exit)
-        read -rp "确认退出程序？(y/N): " confirm
-        if [[ "${confirm,,}" == "y" || "${confirm,,}" == "yes" ]]; then
-          echo "已退出。"
-          exit 0
-        else
-          echo "已取消，继续管理。"
-        fi
-        ;;
-      *)
-        echo "无效选择，请重试。"
-        ;;
+      *) echo "无效选项，请重试" ;;
     esac
-    echo "按 Enter 继续..."
-    read -r
+    echo
+    read -rp "按 Enter 键继续..." 
+    clear
+    show_existing_services
   done
 }
 
-# 直接进入菜单（即使已有基础服务）
+# 关键：真正进入交互菜单
 menu
