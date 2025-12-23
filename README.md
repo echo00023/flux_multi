@@ -31,10 +31,12 @@ Flux-panel 是一个功能强大的流量转发管理平台（基于 gost），�
 
 ### 一键运行
 
-```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/echo00023/flux_multi/refs/heads/main/flux_multi.sh)
+
 或使用短链（若可用）：
+
 Bashbash <(curl -fsSL https://go.saku.foo/https://raw.githubusercontent.com/echo00023/flux_multi/refs/heads/main/flux_multi.sh)
+
 脚本启动后会自动进入交互式菜单：
 text===== flux_agent 多面板管理 =====
 当前已配置的面板实例:
