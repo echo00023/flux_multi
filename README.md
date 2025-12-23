@@ -74,16 +74,23 @@ bash <(curl -fsSL https://go.saku.foo/https://raw.githubusercontent.com/echo0002
 ## 路径说明
 
 基础安装目录：/etc/flux_agent
+
 多面板配置根目录：/etc/flux_agent_panels/<标识名>/
+
 服务文件位置：/etc/systemd/system/flux_agent_<标识名>.service
+
 日志查看：journalctl -u flux_agent_p1.service -f
 
 ## 注意事项
 
 标识名必须为半角字符：只能包含英文字母、数字、下划线 _、破折号 -。禁止使用中文、全角字符、空格，否则会导致 systemd 服务创建失败。
+
 依赖工具：curl、systemctl、jq（可选）
+
 首次运行若系统中未检测到基础 flux_agent，脚本会自动下载并安装官方客户端（来自 bqlpfy/flux-panel v2.0.6-beta）
+
 本脚本不会修改或删除官方的单实例服务 flux_agent.service
+
 添加面板后若服务启动失败，请查看日志：journalctl -u flux_agent_<标识名>.service
 
 ## 常见问题
