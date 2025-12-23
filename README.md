@@ -39,7 +39,8 @@ bash <(curl -fsSL https://go.saku.foo/https://raw.githubusercontent.com/echo0002
 
 
 脚本启动后会自动进入交互式菜单：
-text===== flux_agent 多面板管理 =====
+
+===== flux_agent 多面板管理 =====
 当前已配置的面板实例:
   - p1  (服务状态: active)
   - hk1 (服务状态: active)
@@ -87,22 +88,27 @@ text===== flux_agent 多面板管理 =====
 
 ## 常见问题
 Q: 添加面板后服务启动失败？
+
 A: 常见原因：地址/密钥错误、网络不通、端口被占用。请执行 journalctl -u flux_agent_p1.service -f 查看详细日志。
 
 Q: 如何查看所有 Flux Agent 服务状态？
+
 A:Bashsystemctl list-units 'flux_agent*.service'
 
 Q: 如何手动修改某个面板的配置？
+
 A: 编辑对应目录下的配置文件：
 Bashnano /etc/flux_agent_panels/p1/config.json
 修改后重启服务：
 Bashsystemctl restart flux_agent_p1.service
 
 Q: 想删除旧的 device.id 重新绑定设备？
+
 A: 删除对应目录下的 device.id 文件后重启服务即可：
 Bashrm /etc/flux_agent_panels/p1/device.id
 systemctl restart flux_agent_p1.service
 
 # 贡献与反馈
 欢迎提交 Issue 或 Pull Request 改进脚本！
+
 仓库地址：https://github.com/echo00023/flux_multi
