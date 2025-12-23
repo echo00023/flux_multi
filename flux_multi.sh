@@ -83,13 +83,13 @@ add_panel() {
 
   CONFIG_FILE="$PANEL_DIR/config.json"
   if command -v jq >/dev/null 2>&1 && [ -f "$CONFIG_FILE" ]; then
-    echo "[INFO] 使用 jq 更新 config.json 中的地址和密钥(假设字段为 api / secret)。"
+    echo "[INFO] 使用 jq 更新 config.json 中的地址和密钥。"
     tmp="$(mktemp)"
     jq \
-      --arg api "$PANEL_ADDR" \
+      --arg addr "$PANEL_ADDR" \
       --arg secret "$PANEL_SECRET" \
-      '.api = $api | .secret = $secret' \
-      "$CONFIG_FILE" >"$tmp" || true
+      '.addr = $addr | .secret = $secret' \
+      "$CONFIG_FILE" >"$tmp"
     if [ -s "$tmp" ]; then
       mv "$tmp" "$CONFIG_FILE"
     else
@@ -100,7 +100,7 @@ add_panel() {
     echo "[WARN] 未检测到 jq 或 config.json 不存在，写入一个简单模板配置，请按需手动调整: $CONFIG_FILE"
     cat >"$CONFIG_FILE" <<EOF_CFG
 {
-  "api": "$PANEL_ADDR",
+  "addr": "$PANEL_ADDR",
   "secret": "$PANEL_SECRET"
 }
 EOF_CFG
