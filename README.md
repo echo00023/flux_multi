@@ -49,7 +49,7 @@ text===== flux_agent 多面板管理 =====
 0) 退出程序
 
 请选择 [0-3]:
-操作说明
+## 操作说明
 
 添加新面板
 输入唯一标识名（建议使用半角英文、数字，如 p1、us1、hk2）
@@ -69,14 +69,14 @@ text===== flux_agent 多面板管理 =====
 需要二次确认，防止误退出
 
 
-路径说明
+## 路径说明
 
 基础安装目录：/etc/flux_agent
 多面板配置根目录：/etc/flux_agent_panels/<标识名>/
 服务文件位置：/etc/systemd/system/flux_agent_<标识名>.service
 日志查看：journalctl -u flux_agent_p1.service -f
 
-注意事项
+## 注意事项
 
 标识名必须为半角字符：只能包含英文字母、数字、下划线 _、破折号 -。禁止使用中文、全角字符、空格，否则会导致 systemd 服务创建失败。
 依赖工具：curl、systemctl、jq（可选）
@@ -84,21 +84,24 @@ text===== flux_agent 多面板管理 =====
 本脚本不会修改或删除官方的单实例服务 flux_agent.service
 添加面板后若服务启动失败，请查看日志：journalctl -u flux_agent_<标识名>.service
 
-常见问题
+## 常见问题
 Q: 添加面板后服务启动失败？
 A: 常见原因：地址/密钥错误、网络不通、端口被占用。请执行 journalctl -u flux_agent_p1.service -f 查看详细日志。
+
 Q: 如何查看所有 Flux Agent 服务状态？
-A:
-Bashsystemctl list-units 'flux_agent*.service'
+A:Bashsystemctl list-units 'flux_agent*.service'
+
 Q: 如何手动修改某个面板的配置？
 A: 编辑对应目录下的配置文件：
 Bashnano /etc/flux_agent_panels/p1/config.json
 修改后重启服务：
 Bashsystemctl restart flux_agent_p1.service
+
 Q: 想删除旧的 device.id 重新绑定设备？
 A: 删除对应目录下的 device.id 文件后重启服务即可：
 Bashrm /etc/flux_agent_panels/p1/device.id
 systemctl restart flux_agent_p1.service
-贡献与反馈
+
+# 贡献与反馈
 欢迎提交 Issue 或 Pull Request 改进脚本！
 仓库地址：https://github.com/echo00023/flux_multi
