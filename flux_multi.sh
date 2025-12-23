@@ -70,6 +70,10 @@ add_panel() {
     echo "[ERROR] 面板 $name 已存在"
     return
   fi
+  if ! [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "[ERROR] 标识名只能包含英文字母、数字、下划线和破折号！"
+  return
+  fi
 
   mkdir -p "$PANELS_ROOT/$name"
   cp -a "$BASE_DIR/." "$PANELS_ROOT/$name/"
