@@ -26,7 +26,7 @@
 
 在服务器上执行下面命令启动管理脚本（请根据实际仓库路径替换用户名与仓库名）：  
 
-bash <(curl -fsSL https://raw.githubusercontent.com/echo00023/flux_multi/refs/heads/main/flux_multi.sh)
+bash <(curl -fsSL https://go.saku.foo/https://raw.githubusercontent.com/echo00023/flux_multi/refs/heads/main/flux_multi.sh)
 
 执行后会进入交互式菜单，无需手动编辑 systemd 单元文件。  
 
